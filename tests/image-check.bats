@@ -23,6 +23,9 @@ setup() {
     for name in core web lnpp; do : > "$T/usr/share/keel/appliances/$name.yaml"; done
     : > "$T/usr/bin/gunicorn"
     cp "$BATS_TEST_DIRNAME/../overlay/usr/share/keel-lnpp/app/keel_check.py" "$T/usr/share/keel-lnpp/app/"
+    mkdir -p "$T/usr/lib/systemd/system-preset"
+    cp "$BATS_TEST_DIRNAME/../overlay/usr/lib/systemd/system-preset/20-keel-lnpp.preset" \
+        "$T/usr/lib/systemd/system-preset/"
     printf 'root:x:0:0:root:/root:/bin/bash\nkeel-check:x:998:998::/nonexistent:/usr/sbin/nologin\n' > "$T/etc/passwd"
 }
 
@@ -123,4 +126,20 @@ setup() {
     run "$CHECK"
     [ "$status" -eq 1 ]
     [ "$(grep -c FATAL <<< "$output")" -eq 2 ]
+}
+
+@test "WAL archival that a first boot would enable fails the build (keel#201)" {
+    rm "$T/usr/lib/systemd/system-preset/20-keel-lnpp.preset"
+    run "$CHECK"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"pg_receivewal@.service"* ]]
+}
+
+@test "WAL archival enabled in the image fails the build" {
+    mkdir -p "$T/etc/systemd/system/postgresql@17-main.service.wants"
+    ln -s /usr/lib/systemd/system/pg_receivewal@.service \
+        "$T/etc/systemd/system/postgresql@17-main.service.wants/pg_receivewal@17-main.service"
+    run "$CHECK"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"pg_receivewal"* ]]
 }

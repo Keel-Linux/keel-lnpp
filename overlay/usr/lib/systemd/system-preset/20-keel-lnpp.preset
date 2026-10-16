@@ -1,0 +1,10 @@
+# keel-lnpp: postgresql-common's WAL archival is not the backup of this
+# stack (Keel-Linux/keel#201). systemd applies the presets on the first
+# boot, when /etc/machine-id is missing or "uninitialized", as in an image,
+# and on `systemctl preset-all`. Debian's presets enable every unit they do
+# not name: pg_receivewal@ would then start with each cluster, stream its
+# WAL into /var/backups/postgresql, hold a replication slot, and read as a
+# replica in keel inspect and keel diff. keel-overlay-etcd does the same
+# for etcd.
+disable pg_receivewal@.service
+disable pg_compresswal@.timer
