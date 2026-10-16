@@ -1,3 +1,13 @@
+keel-lnpp-19.0 (2) keel; urgency=low
+
+  * 40lnpp-check keeps CONNECT on keel_check for PUBLIC, PostgreSQL's
+    default. keel's reseed of a pair asks pg_database_size() of every
+    database as the replication role, and the REVOKE made the reseed of
+    the replica fail on hw12-br1 ("permission denied for database
+    keel_check"). PUBLIC has no privilege on the table.
+
+ -- KeelLinux maintainers <admin@keellinux.org>  Fri, 16 Oct 2026 07:50:00 +0000
+
 keel-lnpp-19.0 (1) keel; urgency=low
 
   * The first recipe of the lnpp layer (handbook decision 0059): Nginx,
