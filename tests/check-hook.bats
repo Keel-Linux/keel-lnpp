@@ -58,7 +58,11 @@ stub() {
     run ! grep -qi 'PASSWORD' "$SQL"
     grep -q 'GRANT SELECT ON boot TO "keel-check"' "$SQL"
     grep -q 'GRANT CONNECT ON DATABASE keel_check TO "keel-check"' "$SQL"
-    grep -q 'REVOKE ALL ON DATABASE keel_check FROM PUBLIC' "$SQL"
+    # CONNECT stays with PUBLIC, PostgreSQL's default: keel's reseed of a
+    # pair asks pg_database_size() of every database as the replication
+    # role, which needs CONNECT (found on hw12-br1, 2026-10-16). PUBLIC
+    # gets no privilege on the table.
+    run ! grep -q 'REVOKE ALL ON DATABASE keel_check FROM PUBLIC' "$SQL"
     run ! grep -qE 'GRANT (INSERT|UPDATE|DELETE|ALL)' "$SQL"
 }
 
