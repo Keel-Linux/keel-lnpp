@@ -1,3 +1,16 @@
+keel-lnpp-19.0 (3) keel; urgency=low
+
+  * 40lnpp-check revokes CONNECT on keel_check from PUBLIC again. Only
+    the page's role connects. keel 0.23.33 reseeds a pair without
+    CONNECT on every database (Keel-Linux/keel#183), and this image
+    carries a keel that has it.
+  * The image carries keel 0.23.39 from trixie-testing. A paired replica
+    gets the primary's Anubis key by itself (Keel-Linux/common#56). etcd
+    starts at the third join with no drift (Keel-Linux/keel#188), and
+    the VIP overlay waits for etcd with no drift (Keel-Linux/keel#106).
+
+ -- KeelLinux maintainers <admin@keellinux.org>  Fri, 16 Oct 2026 10:14:27 +0000
+
 keel-lnpp-19.0 (2) keel; urgency=low
 
   * 40lnpp-check keeps CONNECT on keel_check for PUBLIC, PostgreSQL's
