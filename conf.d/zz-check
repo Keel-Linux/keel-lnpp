@@ -15,6 +15,9 @@
 # - keel-check, the user of the page, is a system user with no shell and
 #   no home. PostgreSQL authenticates it by peer, so it has no password.
 # - gunicorn, psycopg and the check application are in the image.
+# - postgresql-common's WAL archival (pg_receivewal@, pg_compresswal@) is
+#   disabled by a preset, so a first boot does not enable it, and no link
+#   enables it (Keel-Linux/keel#201).
 #
 # KEEL_CONF_ROOT is the tree to work on, empty (the chroot's /) in a build;
 # tests/image-check.bats sets it to a scratch tree.
@@ -23,6 +26,7 @@ failed=0
 SOCKET_UNIT=/usr/lib/systemd/system/keel-lnpp-check.socket
 ROUTE=/etc/nginx/keel-default.d/50-keel-lnpp.conf
 APPLIANCES=/usr/share/keel/appliances
+PRESET=/usr/lib/systemd/system-preset/20-keel-lnpp.preset
 
 fatal() {
     echo "FATAL: $*" >&2
@@ -74,6 +78,16 @@ if [ ! -d "$root/usr/lib/python3/dist-packages/psycopg" ]; then
 fi
 if [ ! -f "$root/usr/share/keel-lnpp/app/keel_check.py" ]; then
     fatal "/usr/share/keel-lnpp/app/keel_check.py is not in the image"
+fi
+
+for unit in pg_receivewal@.service pg_compresswal@.timer; do
+    if ! grep -qx "disable $unit" "$root$PRESET" 2>/dev/null; then
+        fatal "$PRESET does not disable $unit: the first boot would enable postgresql-common's WAL archival"
+    fi
+done
+found="$(find "$root/etc/systemd/system" -name 'pg_receivewal@*' -o -name 'pg_compresswal@*' 2>/dev/null | head -1)"
+if [ -n "$found" ]; then
+    fatal "postgresql-common's WAL archival is enabled in the image: ${found#"$root"}"
 fi
 
 exit "$failed"

@@ -1,3 +1,17 @@
+keel-lnpp-19.0 (4) keel; urgency=low
+
+  * A preset disables postgresql-common's WAL archival (pg_receivewal@,
+    pg_compresswal@). The first boot applies Debian's presets, which
+    enable every unit they do not name: pg_receivewal@17-main streamed
+    the WAL into /var/backups, and the server read as a primary in keel
+    diff on a node with no replica (Keel-Linux/keel#201). Found by the
+    release test of 19.0-3; 19.0-3 is not published.
+  * The image carries keel 0.23.41 from trixie-testing: etcd forms with
+    every member (Keel-Linux/keel#199), and every mesh peer sends a
+    keepalive (Keel-Linux/keel#140).
+
+ -- KeelLinux maintainers <admin@keellinux.org>  Fri, 16 Oct 2026 18:19:36 +0000
+
 keel-lnpp-19.0 (3) keel; urgency=low
 
   * 40lnpp-check revokes CONNECT on keel_check from PUBLIC again. Only
