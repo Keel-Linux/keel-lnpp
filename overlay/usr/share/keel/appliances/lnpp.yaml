@@ -1,0 +1,30 @@
+manifest_version: 1
+kind: appliance
+name: lnpp
+title: Keel LNPP
+summary: Nginx, PostgreSQL and Python with gunicorn on Keel Web, alone or as a replicated pair (0059)
+base: web
+# The overlays are Core's and Web's, inherited with their states: this
+# layer adds none, and a spec that names it writes all eight out (0027).
+processes:
+  - name: postgresql
+    unit: postgresql.service
+    # ::1 and 127.0.0.1 as the layer ships it; on a pair,
+    # database.server.listen adds the node's overlay address and the VIP,
+    # so 5432 is a mesh port: on the WireGuard interface, never on the
+    # uplink.
+    listen: [{port: 5432, protocol: tcp, expose: mesh}]
+  - name: keel-lnpp-check
+    # gunicorn, started by keel-lnpp-check.socket on the unix socket
+    # /run/keel-lnpp/check.sock, which Nginx proxies /keel-check/ to: it
+    # opens no TCP port, so it has no listen entry.
+    unit: keel-lnpp-check.service
+checks:
+  - {name: postgresql, process: postgresql, type: protocol, protocol: pgsql,
+     address: loopback, port: 5432, on_failure: restart}
+secrets:
+  - name: db_password
+    description: The PostgreSQL role the first boot sets, from DB_PASS
+    generate: allowed
+    # the database replicates with the rest: a pair holds one value
+    shared: true

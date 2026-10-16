@@ -1,0 +1,67 @@
+#!/bin/bash -e
+# The database of the check page of Keel LNPP (handbook decision 0059,
+# point 6): the role keel-check, the database keel_check, its table boot,
+# and one row for this host.
+#
+# The check page (/usr/share/keel-lnpp/app/keel_check.py, served by
+# keel-lnpp-check.service) runs as the operating system user keel-check.
+# PostgreSQL authenticates it by peer on the local socket (the line
+# "local all all peer" of Debian, which keel keeps in its own hba file on a
+# pair), so the role has no password, and nothing here makes one. It may
+# connect to keel_check and read the table, and nothing else: the page
+# only reads.
+#
+# A standby (pg_is_in_recovery) refuses writes and gets the database with
+# the base backup of the primary (decision 0054), so this hook writes
+# nothing there and says so. A row of the primary on the page of a standby
+# is what proves the replication.
+#
+# Each statement is guarded, so a second run creates nothing twice and
+# keeps the first row of a host. It runs after 35pgsqlpass and
+# 36pgsqlverify, when the server is up.
+
+INITHOOKS_DEFAULT="${INITHOOKS_DEFAULT:-/etc/default/inithooks}"
+# shellcheck source=/etc/default/inithooks
+source "$INITHOOKS_DEFAULT"
+# shellcheck source=../lib/postgresql.sh
+source "$INITHOOKS_PATH/lib/postgresql.sh"
+
+fatal() { echo "fatal [40lnpp-check]: $*" >&2; exit 1; }
+
+PSQL=(runuser -u postgres -- psql --quiet --no-psqlrc --tuples-only --no-align --set=ON_ERROR_STOP=1)
+
+systemctl start "$PGSQL_SERVICE.service"
+pgsql_wait_ready "pg_isready --quiet" "$PGSQL_WAIT_TRIES" \
+    || fatal "$PGSQL_SERVICE did not answer after $PGSQL_WAIT_TRIES tries"
+
+recovery=$("${PSQL[@]}" --dbname=postgres --command="SELECT pg_is_in_recovery()")
+if [ "$recovery" = t ]; then
+    echo "40lnpp-check: this server is a standby (in recovery): it writes" \
+        "nothing, and the check page shows the rows of the primary"
+    exit 0
+fi
+[ "$recovery" = f ] || fatal "pg_is_in_recovery() answered '$recovery', not t or f"
+
+"${PSQL[@]}" --dbname=postgres <<'SQL' || fatal "the statements of the check page failed"
+SELECT 'CREATE ROLE "keel-check" LOGIN'
+    WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'keel-check') \gexec
+SELECT 'CREATE DATABASE keel_check'
+    WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'keel_check') \gexec
+REVOKE ALL ON DATABASE keel_check FROM PUBLIC;
+GRANT CONNECT ON DATABASE keel_check TO "keel-check";
+SQL
+
+host=$(hostname)
+"${PSQL[@]}" --dbname=keel_check --set=host="$host" <<'SQL' || fatal "the statements of the check page failed"
+CREATE TABLE IF NOT EXISTS boot (
+    host text PRIMARY KEY,
+    written_at timestamptz NOT NULL DEFAULT now()
+);
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+GRANT USAGE ON SCHEMA public TO "keel-check";
+GRANT SELECT ON boot TO "keel-check";
+INSERT INTO boot (host) VALUES (:'host') ON CONFLICT (host) DO NOTHING;
+SQL
+
+echo "40lnpp-check: the check page reads keel_check as keel-check," \
+    "a row for $host is in its table"

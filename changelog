@@ -1,0 +1,22 @@
+keel-lnpp-19.0 (1) keel; urgency=low
+
+  * The first recipe of the lnpp layer (handbook decision 0059): Nginx,
+    PostgreSQL 17 and Python 3 with gunicorn, a layer on the web layer
+    (bt-layer lnpp --parent web). The database half is keel-postgresql's,
+    copied: the postgres role without a password in the image, the two
+    loopback addresses, firstboot.d/36pgsqlverify. The manifest
+    /usr/share/keel/appliances/lnpp.yaml (base web) declares PostgreSQL
+    on the mesh port 5432 and the db_password secret, so a spec can name
+    appliance lnpp and declare the pair of decision 0054.
+  * The check page at /keel-check/: keel_check.py, a WSGI application
+    with no framework that gunicorn serves on the unix socket of
+    keel-lnpp-check.socket, as the system user keel-check. It reads
+    PostgreSQL by peer authentication, with SELECT on one table only, and
+    shows the versions, the role of the server and the rows that
+    firstboot.d/40lnpp-check writes. Nginx reaches it through
+    /etc/nginx/keel-default.d/50-keel-lnpp.conf (keel-web 0.3.0).
+  * conf.d/zz-check fails the build on Apache, on a second appliance
+    manifest on top, and on a check page that does not start from its
+    socket.
+
+ -- KeelLinux maintainers <admin@keellinux.org>  Fri, 16 Oct 2026 08:00:00 +0000

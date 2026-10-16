@@ -1,0 +1,132 @@
+#!/bin/bash -ex
+# The lnpp layer (handbook decision 0059): PostgreSQL, Python and gunicorn
+# on Keel Web. The database half is what keel-postgresql's conf.d/main does,
+# copied (decision 0059, point 3); the Python half is the check page.
+#
+# common's conf/pgsql has already run (COMMON_CONF of mk/turnkey/pgsql.mk):
+# it recreated the cluster as UTF-8, turned on password encryption, reduced
+# shared_buffers, gave root a superuser role, and set the postgres role's
+# password. That last step is the one thing this layer has to undo.
+#
+# conf/pgsql opens with
+#
+#     set ${PGSQL_PASS:=postgres}
+#
+# so a build that names no PGSQL_PASS gives the superuser of the database
+# the password 'postgres'. For an appliance that is a bad default; for a
+# published layer it is worse, because the layer is fetched by name and
+# reused, so every appliance built on it would ship the same known
+# superuser password, and one whose first boot hook failed would keep it.
+#
+# Removing the password rather than choosing another one is deliberate. A
+# build time value would be the same on every appliance built from this
+# layer, and a random one would make the layer irreproducible (brief
+# section 5.4: same commit plus same manifest, same bytes). With no
+# password the role authenticates nothing over TCP until
+# firstboot.d/35pgsqlpass sets it from DB_PASS, so the failure mode is a
+# database nobody can reach rather than a database everybody can.
+
+PGSQL_VER=$(ls /etc/postgresql/)
+CONF_DIR=/etc/postgresql/$PGSQL_VER/main
+
+systemctl start postgresql
+
+su postgres -c "psql --quiet postgres" <<'EOF'
+ALTER ROLE postgres PASSWORD NULL;
+EOF
+
+# rolpassword is null for the role, which is what "cannot authenticate with
+# a password" looks like in the catalogue.
+su postgres -c "psql --quiet --tuples-only --no-align postgres" <<'EOF' | grep -qx t
+SELECT rolpassword IS NULL FROM pg_authid WHERE rolname = 'postgres';
+EOF
+
+systemctl stop postgresql
+
+# The cluster listens on the loopback of both families and nowhere else,
+# and both are named as literal addresses.
+#
+# Debian's default is listen_addresses = 'localhost', and that was taken
+# for "the loopback of both families" when this layer was written. It is
+# not. Debian's /etc/hosts maps ::1 to ip6-localhost and ip6-loopback and
+# never to localhost, so getaddrinfo("localhost") answers 127.0.0.1 alone
+# and the cluster binds the IPv4 loopback only. Measured on the booted
+# layer: "LISTEN 127.0.0.1:5432" and nothing on [::1]:5432, with ::1 up on
+# lo and pg_hba.conf already holding its scram-sha-256 line for ::1/128.
+# An appliance built on this layer and reaching its database over IPv6,
+# which is the default this project builds for (brief section 10), found
+# nothing listening.
+#
+# Two literal addresses cannot resolve into something else, which is the
+# whole point of writing them out; what they bind to is then proved on the
+# booted machine by the boot test rather than assumed here.
+sed -i "s|^#\?listen_addresses = .*|listen_addresses = '::1,127.0.0.1'\t\t# set by conf.d/main of keel-postgresql: see the comment there|" \
+    "$CONF_DIR/postgresql.conf"
+grep -qE "^listen_addresses = '::1,127\.0\.0\.1'" "$CONF_DIR/postgresql.conf"
+
+# Upstream's postgresql appliance replaces listen_addresses with '*' and
+# appends a pg_hba line accepting password authentication from 0.0.0.0/0.
+# This layer must not inherit either by accident.
+! grep -qE "^listen_addresses = '\*'" "$CONF_DIR/postgresql.conf"
+! grep -qE '^host\s+all\s+all\s+0\.0\.0\.0/0' "$CONF_DIR/pg_hba.conf"
+
+# A TCP connection on the IPv6 loopback is authenticated by password, which
+# is what firstboot.d/36pgsqlverify proves on the booted machine.
+grep -qE '^host\s+all\s+all\s+::1/128\s+scram-sha-256' "$CONF_DIR/pg_hba.conf"
+
+# The check page (decision 0059, points 5 and 6). keel-check is the
+# operating system user of keel-lnpp-check.service: a system user with no
+# shell and no home, which PostgreSQL authenticates by peer, so it has no
+# password. The socket is enabled and the service is not: systemd starts
+# gunicorn at the first request. conf.d/zz-check proves both.
+adduser --system --group --no-create-home --home /nonexistent \
+    --shell /usr/sbin/nologin keel-check
+systemctl enable keel-lnpp-check.socket
+python3 -c 'import psycopg'
+
+# webmin-postgresql is what puts the database in the panel core already
+# carries; the plan asks for it, so fail the build rather than ship a panel
+# without its database module (the boot test checks the running appliance).
+dpkg-query -W -f '${Status}' webmin-postgresql | grep -qx 'install ok installed'
+
+# fab-plan-resolve keeps a package the parent layer already carries at the
+# parent's version, so the project's packages are upgraded here, from the
+# Keel archive the parent layer names (overlays/turnkey.d/keel-apt of
+# common; trixie-testing as well when the build has KEEL_APT_TRACK=testing).
+#
+# The overlay of this layer ships /etc/confconsole/services.txt, which is a
+# conffile of confconsole, so dpkg sees it as locally modified and asks what
+# to do with it. The conf script runs with stdin closed, dpkg reads end of
+# file at the prompt and leaves confconsole "install ok unpacked", which
+# fails this script. Keep the overlay's file without asking.
+export DEBIAN_FRONTEND=noninteractive
+apt-get update --error-on=any
+apt-get install -y --only-upgrade \
+    -o Dpkg::Options::=--force-confdef \
+    -o Dpkg::Options::=--force-confold \
+    inithooks confconsole keel
+
+# A half configured package keeps its new version, so check the state too.
+[[ $(dpkg-query -W -f '${Status}\n' inithooks confconsole keel \
+    | grep -c '^install ok installed$') -eq 3 ]]
+
+# Not a floor and not a literal: each of the three is installed at the
+# version the Keel archive offers as its candidate, from the suite of the
+# track this build reads. A build that read a stale index, or any other
+# source, stops here instead of shipping a layer that is not what the
+# archive says it is. bin/keel-project-packages was copied into the tree
+# for this (Makefile, root.patched/pre) and leaves with it.
+/usr/local/lib/keel-build/keel-project-packages inithooks confconsole keel
+rm -rf /usr/local/lib/keel-build
+dpkg-query -W -f '${Package} ${Version} ${Status}\n' inithooks confconsole keel
+
+# No build time package source exists any more, and none may reach the
+# image: nothing the image keeps may name the build host's old staging
+# archive, its pin or its keyring, and the apt lists are not shipped.
+rm -rf /var/lib/apt/lists/*
+if grep -rlsE 'trixie-staging|/srv/keel-apt|l=Keel Linux staging|keel-staging' /etc/apt/sources.list \
+    /etc/apt/sources.list.d /etc/apt/preferences /etc/apt/preferences.d /etc/apt/keyrings; then
+    echo "the apt files above name the build host's staging archive" >&2
+    exit 1
+fi
+[ ! -e /usr/local/lib/keel-build ]

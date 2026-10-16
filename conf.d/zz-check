@@ -1,0 +1,79 @@
+#!/bin/bash -e
+# Run by fab in the image chroot of the lnpp layer, after conf.d/main. It
+# changes nothing: it fails the build when the image is not what handbook
+# decision 0059 says, and reports every problem it finds.
+#
+# - No Apache: nginx is the only web server of Keel.
+# - The check page starts from its socket: keel-lnpp-check.socket enabled,
+#   keel-lnpp-check.service not enabled on its own (the socket starts it).
+# - The route in keel-web's include directory proxies to the socket that
+#   the socket unit holds.
+# - lnpp.yaml is the one appliance manifest that no other is built on:
+#   the manifests of keel-postgresql and keel-mariadb have base core, so
+#   either one would be a second top, and keel inspect could not name the
+#   appliance.
+# - keel-check, the user of the page, is a system user with no shell and
+#   no home. PostgreSQL authenticates it by peer, so it has no password.
+# - gunicorn, psycopg and the check application are in the image.
+#
+# KEEL_CONF_ROOT is the tree to work on, empty (the chroot's /) in a build;
+# tests/image-check.bats sets it to a scratch tree.
+root="${KEEL_CONF_ROOT:-}"
+failed=0
+SOCKET_UNIT=/usr/lib/systemd/system/keel-lnpp-check.socket
+ROUTE=/etc/nginx/keel-default.d/50-keel-lnpp.conf
+APPLIANCES=/usr/share/keel/appliances
+
+fatal() {
+    echo "FATAL: $*" >&2
+    failed=1
+}
+
+for path in /usr/sbin/apache2 /usr/lib/systemd/system/apache2.service \
+        /lib/systemd/system/apache2.service; do
+    if [ -e "$root$path" ]; then
+        fatal "Apache is in the image ($path): nginx is the only web server (decision 0059)"
+    fi
+done
+
+if [ ! -L "$root/etc/systemd/system/sockets.target.wants/keel-lnpp-check.socket" ]; then
+    fatal "keel-lnpp-check.socket is not enabled: nothing starts the check page"
+fi
+wanted="$root/etc/systemd/system/multi-user.target.wants/keel-lnpp-check.service"
+if [ -e "$wanted" ] || [ -L "$wanted" ]; then
+    fatal "keel-lnpp-check.service is enabled on its own: the socket starts it"
+fi
+
+socket_path="$(sed -n 's/^ListenStream=//p' "$root$SOCKET_UNIT" 2>/dev/null || true)"
+if [ -z "$socket_path" ] \
+        || ! grep -qF "proxy_pass http://unix:$socket_path;" "$root$ROUTE" 2>/dev/null; then
+    fatal "$ROUTE does not proxy to ${socket_path:-the socket of $SOCKET_UNIT}"
+fi
+
+if [ ! -f "$root$APPLIANCES/lnpp.yaml" ]; then
+    fatal "$APPLIANCES/lnpp.yaml is not in the image"
+fi
+for name in postgresql mariadb; do
+    if [ -e "$root$APPLIANCES/$name.yaml" ]; then
+        fatal "$APPLIANCES/$name.yaml is in the image: a second manifest on top, so keel inspect cannot name the appliance"
+    fi
+done
+
+user="$(grep '^keel-check:' "$root/etc/passwd" 2>/dev/null || true)"
+if [ -z "$user" ]; then
+    fatal "keel-check is not a system user of the image"
+elif [ "$(cut -d: -f6,7 <<< "$user")" != /nonexistent:/usr/sbin/nologin ]; then
+    fatal "keel-check is not a system user with no shell and no home: $user"
+fi
+
+if [ ! -e "$root/usr/bin/gunicorn" ]; then
+    fatal "/usr/bin/gunicorn is not in the image"
+fi
+if [ ! -d "$root/usr/lib/python3/dist-packages/psycopg" ]; then
+    fatal "psycopg is not in the image (python3-psycopg)"
+fi
+if [ ! -f "$root/usr/share/keel-lnpp/app/keel_check.py" ]; then
+    fatal "/usr/share/keel-lnpp/app/keel_check.py is not in the image"
+fi
+
+exit "$failed"

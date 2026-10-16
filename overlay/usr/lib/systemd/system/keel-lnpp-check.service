@@ -1,0 +1,42 @@
+# keel-lnpp: the check page, gunicorn from Debian (handbook decision 0059,
+# point 5). keel-lnpp-check.socket starts it and hands it the socket
+# (LISTEN_FDS), so gunicorn binds nothing itself. It runs as keel-check, a
+# system user with no shell and no home, which PostgreSQL authenticates by
+# peer: the application has no password to keep. It may write nothing on
+# the disk and reach nothing but unix sockets.
+[Unit]
+Description=Keel LNPP check page (gunicorn)
+Requires=keel-lnpp-check.socket
+After=network.target postgresql.service
+
+[Service]
+Type=notify
+NotifyAccess=main
+User=keel-check
+Group=keel-check
+ExecStart=/usr/bin/gunicorn --workers 2 --chdir /usr/share/keel-lnpp/app --access-logfile - keel_check:application
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
