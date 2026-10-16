@@ -1,0 +1,25 @@
+#include <turnkey/base>
+
+/* PostgreSQL 17. There is no plans/turnkey/pgsql in common, so the packages
+   are named here. mk/turnkey/pgsql.mk brings the conf script and the
+   overlay that carries bin/pgsqlconf.py and firstboot.d/35pgsqlpass. */
+postgresql
+
+/* the command line client: firstboot.d/36pgsqlverify proves the declared
+   password, and firstboot.d/40lnpp-check makes the database of the check
+   page */
+postgresql-client
+
+/* webmin-postgresql puts the database in the panel core already carries */
+webmin-postgresql
+
+/* Python 3 and the application server of decision 0059, point 5, from
+   Debian 13 only: nothing is installed with pip */
+python3
+gunicorn
+python3-psycopg
+
+/* project packages, from the Keel archive (archive.keellinux.org) */
+inithooks
+confconsole
+keel

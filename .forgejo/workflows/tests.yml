@@ -1,0 +1,111 @@
+# Tests of the keel-lnpp layer recipe (handbook decision 0059), on the
+# Forgejo runners of Keel-Linux (decision 0056). Each call of a reusable
+# workflow has a runs-on line, because Forgejo runs a called workflow on
+# the runner of the caller.
+#   tests:     the shell this layer writes under bats and kcov
+#              (tests/coverage.sh), with the threshold committed here
+#   python:    the check page (overlay/usr/share/keel-lnpp/app) under
+#              pytest and coverage, lines and branches
+#   stack:     PostgreSQL, the first boot hook of the page, gunicorn from
+#              its systemd socket and Nginx with keel-web's include
+#              directory, on a booted trixie container (tests/stack.bats),
+#              and keel's schema check of the manifest and the specs
+#   appliance: fetch the published layer, verify it, assemble it, boot it
+#              in LXC and run tests/boot-test.sh against it
+#   package:   a change that the layer ships needs a changelog entry
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    # Six shell files, all at 100 percent (COVERAGE.md). The threshold is
+    # the measured number and is only ever raised (decision 0006).
+    runs-on: keel-host
+    uses: keel-linux/.github/.github/workflows/test-shell.yml@main
+    with:
+      threshold: 100
+  python:
+    # The check page, keel_check.py: 100 percent of lines and branches,
+    # measured on 2026-10-16. psycopg is not needed: the tests give the
+    # application a fake connection.
+    runs-on: keel-host
+    uses: keel-linux/.github/.github/workflows/test-python.yml@main
+    with:
+      threshold: 100
+      package: overlay/usr/share/keel-lnpp/app
+      tests: tests/python
+  stack:
+    # The stack on a machine, from Debian 13's packages. keel-web 0.3.0 is
+    # not installed: tests/stack.bats puts a stand-in default site with its
+    # include line in place. keel validates the manifest against the
+    # manifests of the chain, taken from the commits pinned below.
+    runs-on: keel-lxc
+    uses: keel-linux/.github/.github/workflows/lxc-trixie.yml@main
+    with:
+      systemd: true
+      timeout: 30
+      run: |
+        # keel main of 2026-10-16 (0.23.32); keel-core and keel-web master,
+        # common 19.x of the same day: the manifests of the chain
+        KEEL_COMMIT=384afa6bfea7990159f827b93f4ad2f01f51f676
+        CORE_COMMIT=master
+        WEB_COMMIT=master
+        COMMON_COMMIT=19.x
+        apt-get update -qq
+        apt-get install -y -qq --no-install-recommends \
+          ca-certificates git bats curl iproute2 procps nginx postgresql \
+          postgresql-client gunicorn python3-psycopg python3-yaml adduser
+        fetch() {
+          git init -q "/tmp/src/$1"
+          git -C "/tmp/src/$1" fetch -q --depth 1 "https://git.pop.coop/Keel-Linux/$1.git" "$2"
+          git -C "/tmp/src/$1" checkout -q FETCH_HEAD
+        }
+        fetch keel "$KEEL_COMMIT"
+        fetch keel-core "$CORE_COMMIT"
+        fetch keel-web "$WEB_COMMIT"
+        fetch common "$COMMON_COMMIT"
+        mkdir -p /tmp/manifests/overlays
+        cp /tmp/src/keel-core/packages/keel-core/manifest.yaml /tmp/manifests/core.yaml
+        cp /tmp/src/keel-web/packages/keel-web/manifest.yaml /tmp/manifests/web.yaml
+        for overlay in installer wireguard etcd crowdsec vip nginx coraza anubis; do
+          cp "/tmp/src/common/packages/$overlay/manifest.yaml" "/tmp/manifests/overlays/$overlay.yaml"
+        done
+        for _ in $(seq 30); do pg_isready -q && break; sleep 1; done
+        KEEL_LNPP_STACK_TEST=1 KEEL_SRC=/tmp/src/keel KEEL_MANIFESTS=/tmp/manifests \
+          bats tests/stack.bats
+  appliance:
+    # The boot test (org-plan section 1): the lnpp layer is fetched from
+    # https://mirror.keellinux.org/layers with web and core under it,
+    # verified, assembled, booted in LXC and checked by tests/boot-test.sh.
+    # The lnpp layer is not published yet: its first images are testing
+    # pre-releases (decision 0052, section 8), which never reach the
+    # mirror. So allow_unpublished is true, and the workflow makes it an
+    # error once the mirror answers for lnpp. The evidence for this branch
+    # is the image built from it and booted on the real platform
+    # (tests/README.md).
+    if: vars.KEEL_LXC_RUNNER == 'true'
+    runs-on: keel-lxc
+    uses: keel-linux/.github/.github/workflows/test-appliance.yml@main
+    with:
+      appliance: lnpp
+      parent: web
+      allow_unpublished: true
+      timeout: 60
+  package:
+    # Only on a pull request: require-changelog compares the two commits of
+    # the pull request. What bt-layer records in the manifest is the top
+    # entry of ./changelog, so that is the file a change which ships has to
+    # bump.
+    if: github.event_name == 'pull_request'
+    runs-on: keel-host
+    uses: keel-linux/.github/.github/workflows/require-changelog.yml@main
+    with:
+      changelog: changelog
+      exempt: '^(tests/|docs/|\.github/|\.forgejo/|keel/|README|COVERAGE\.md|LICENSE|\.gitignore)'

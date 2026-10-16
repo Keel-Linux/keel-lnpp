@@ -1,0 +1,65 @@
+#!/bin/bash -e
+# Say whether the password the instance description declared reached the
+# database.
+#
+# The setting itself is not done here. secrets.db_password renders to
+# DB_PASS (SECRET_VARS, the same table in keel/spec/constants.py and in
+# libinithooks/declarative.py of inithooks), and common's
+# overlays/pgsql firstboot.d/35pgsqlpass already reads DB_PASS and hands it
+# to bin/pgsqlconf.py. That half of the vocabulary is right and is not
+# rewritten here.
+#
+# What was missing is the answer. On an appliance whose whole purpose is
+# the database, a password that did not arrive is the one failure that must
+# not be silent: keel diff never compares secrets, on either side, so
+# nothing else would say a word. 35pgsqlpass reports on setting the
+# password, not on whether the database will accept it, and a first boot
+# that ran with nothing declared leaves a role that authenticates nothing,
+# which is what conf.d/main published the layer in.
+#
+# PGSQL_PASS, which mk/turnkey/pgsql.mk adds to CONF_VARS, is a build time
+# variable fab passes to conf/pgsql inside the chroot. It never reaches the
+# inithooks conf and no hook reads it. Nothing here uses it.
+#
+# Decisions live in lib/postgresql.sh; this file is the part that touches
+# the system.
+
+INITHOOKS_DEFAULT="${INITHOOKS_DEFAULT:-/etc/default/inithooks}"
+# shellcheck source=/etc/default/inithooks
+source "$INITHOOKS_DEFAULT"
+# shellcheck source=../lib/postgresql.sh
+source "$INITHOOKS_PATH/lib/postgresql.sh"
+
+fatal() { echo "fatal [36pgsqlverify]: $*" >&2; exit 1; }
+
+if [[ -e "$INITHOOKS_CONF" ]]; then
+    # shellcheck source=/dev/null
+    source "$INITHOOKS_CONF"
+fi
+
+role=$(pgsql_role "${APP_DB_USER-}") \
+    || fatal "'${APP_DB_USER-}' is not a role name this layer will verify"
+
+mapfile -t missing < <(pgsql_missing_values "${DB_PASS-}")
+if [[ ${#missing[@]} -gt 0 ]]; then
+    fatal "no ${missing[*]} in $INITHOOKS_CONF, so the '$role' role has no" \
+        "password and this appliance has no database anyone can reach:" \
+        "declare secrets.db_password in the instance description"
+fi
+
+systemctl start "$PGSQL_SERVICE.service"
+pgsql_wait_ready "pg_isready --quiet --host=$PGSQL_VERIFY_HOST --port=$PGSQL_PORT" \
+    "$PGSQL_WAIT_TRIES" \
+    || fatal "$PGSQL_SERVICE did not answer on [$PGSQL_VERIFY_HOST]:$PGSQL_PORT" \
+        "after $PGSQL_WAIT_TRIES tries"
+
+mapfile -t argv < <(pgsql_verify_argv "$role" "$PGSQL_VERIFY_HOST" "$PGSQL_PORT" "$PGSQL_DATABASE") \
+    || fatal "cannot build the client arguments for $role@$PGSQL_VERIFY_HOST"
+answer=$(PGPASSWORD="$DB_PASS" psql "${argv[@]}") \
+    || fatal "$role cannot authenticate on [$PGSQL_VERIFY_HOST]:$PGSQL_PORT" \
+        "with the declared password"
+pgsql_probe_verdict "$answer" \
+    || fatal "the database answered '$answer', not '$PGSQL_PROBE_ANSWER'"
+
+echo "PostgreSQL role '$role' set from DB_PASS $(pgsql_masked "$DB_PASS")," \
+     "verified on [$PGSQL_VERIFY_HOST]:$PGSQL_PORT"
