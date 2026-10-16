@@ -47,6 +47,7 @@ SELECT 'CREATE ROLE "keel-check" LOGIN'
     WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'keel-check') \gexec
 SELECT 'CREATE DATABASE keel_check'
     WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'keel_check') \gexec
+REVOKE ALL ON DATABASE keel_check FROM PUBLIC;
 GRANT CONNECT ON DATABASE keel_check TO "keel-check";
 SQL
 
