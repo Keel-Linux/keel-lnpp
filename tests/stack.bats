@@ -128,9 +128,17 @@ code() {
 }
 
 @test "a database that does not answer is a 503, and the page comes back with it" {
-    systemctl stop postgresql.service
-    [ "$(code "http://[::1]/keel-check/")" = 503 ]
-    systemctl start postgresql.service
+    # the cluster's own unit: the umbrella postgresql.service can be
+    # active while the cluster is down, and the other way round
+    cluster="$(systemctl list-units --plain --no-legend 'postgresql@*.service' | awk '{print $1; exit}')"
+    [ -n "$cluster" ]
+    systemctl stop "$cluster"
+    run pg_isready -q
+    [ "$status" -ne 0 ]
+    run code "http://[::1]/keel-check/"
+    echo "code with the cluster stopped: $output"
+    [ "$output" = 503 ]
+    systemctl start "$cluster"
     for _ in $(seq 30); do
         pg_isready -q && break
         sleep 1
