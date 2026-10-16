@@ -1,3 +1,12 @@
+keel-lnpp-19.0 (5) keel; urgency=low
+
+  * The image carries keel 0.23.42 from trixie-testing. keel diff does
+    not count a sender with no client address as a replica
+    (Keel-Linux/keel#201). A join does not say that etcd may not run
+    when another step failed (Keel-Linux/keel#198).
+
+ -- KeelLinux maintainers <admin@keellinux.org>  Fri, 16 Oct 2026 20:30:00 +0000
+
 keel-lnpp-19.0 (4) keel; urgency=low
 
   * A preset disables postgresql-common's WAL archival (pg_receivewal@,
