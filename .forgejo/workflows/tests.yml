@@ -52,14 +52,17 @@ jobs:
       systemd: true
       timeout: 30
       run: |
-        # keel main of 2026-10-16 (0.23.32); keel-core and keel-web master,
-        # common 19.x of the same day: the manifests of the chain. Read from
-        # the GitHub mirrors (decision 0056): the containers of the runner
-        # do not reach git.pop.coop, as keel-web's site job also shows.
+        # The commits of 2026-10-16, the day of the last green run, and the
+        # same commits that keel-lnmp pins: keel 0.23.32, keel-core and
+        # keel-web with the manifests of the chain, and common 19.x. A branch
+        # name moves: keel-web master has the syncthing overlay now (0.3.4),
+        # which these commits of keel and common do not know. Read from the
+        # GitHub mirrors (decision 0056): the containers of the runner do not
+        # reach git.pop.coop, as keel-web's site job also shows.
         KEEL_COMMIT=384afa6bfea7990159f827b93f4ad2f01f51f676
-        CORE_COMMIT=master
-        WEB_COMMIT=master
-        COMMON_COMMIT=19.x
+        CORE_COMMIT=432be9fafd3afd091690fcce3433d4721b5b83f6
+        WEB_COMMIT=493438a993a2c46ad9bba58881f56e889a049298
+        COMMON_COMMIT=cff023f0b40ddc5c24baf92b25ce1f233f348f94
         apt-get update -qq
         apt-get install -y -qq --no-install-recommends \
           ca-certificates git bats curl iproute2 procps nginx postgresql \
