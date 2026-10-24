@@ -1,3 +1,12 @@
+keel-lnpp-19.0 (6) keel; urgency=low
+
+  * Stable 1, the first stable release (handbook docs/releases/stable-1-plan.md).
+    The image is built on the stable track: it reads trixie of
+    archive.keellinux.org and not trixie-testing. It carries keel 0.23.49.
+    The image has no other change.
+
+ -- KeelLinux maintainers <admin@keellinux.org>  Sat, 24 Oct 2026 18:05:00 +0000
+
 keel-lnpp-19.0 (5) keel; urgency=low
 
   * The image carries keel 0.23.42 from trixie-testing. keel diff does
