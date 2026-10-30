@@ -89,19 +89,16 @@ jobs:
     # The boot test (org-plan section 1): the lnpp layer is fetched from
     # https://mirror.keellinux.org/layers with web and core under it,
     # verified, assembled, booted in LXC and checked by tests/boot-test.sh.
-    # The lnpp layer is not published yet: its first images are testing
-    # pre-releases (decision 0052, section 8), which never reach the
-    # mirror. So allow_unpublished is true, and the workflow makes it an
-    # error once the mirror answers for lnpp. The evidence for this branch
-    # is the image built from it and booted on the real platform
-    # (tests/README.md).
+    # The lnpp layer is published (stable 1, 2026-10-26), so
+    # allow_unpublished is gone: the workflow makes it an error once the
+    # mirror answers. The evidence for this branch is the image built from
+    # it and booted on the real platform (tests/README.md).
     if: vars.KEEL_LXC_RUNNER == 'true'
     runs-on: keel-lxc
     uses: keel-linux/.github/.github/workflows/test-appliance.yml@main
     with:
       appliance: lnpp
       parent: web
-      allow_unpublished: true
       timeout: 60
   package:
     # Only on a pull request: require-changelog compares the two commits of
