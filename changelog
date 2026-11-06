@@ -1,3 +1,25 @@
+keel-lnpp-19.0 (8) keel; urgency=medium
+
+  * The commissioning test of handbook decision 0075 (a container made from
+    the template on BR1 and BR2, as an operator makes it) found these
+    defects, 2026-11-06:
+  * firstboot.d/36pgsqlverify stopped with "fatal: no DB_PASS" when no
+    password was declared: on the headless first boot, and under keel-init,
+    where 35pgsqlpass asked the password on the console and the inithooks
+    conf is empty. A headless boot now leaves the question to keel-init
+    (console_deferred of inithooks); at a console the hook reads the
+    catalogue as postgres by peer and requires a password there. The copy
+    of keel-postgresql has the same change.
+  * keel/instance.example.yaml named app.options.db_user, which no manifest
+    of the chain declares, and named no appliance, so keel never checked it
+    against the manifests. The example and the boot test's spec now name
+    the appliance, installation.mode and the nine overlays of Core and Web,
+    and no option; the pair example declares overlays.syncthing.
+  * tests/commission.yaml, the commissioning contract, and the CI job
+    "commission / contract" that checks it.
+
+ -- KeelLinux maintainers <admin@keellinux.org>  Fri, 06 Nov 2026 06:00:00 +0000
+
 keel-lnpp-19.0 (7) keel; urgency=medium
 
   * Stable 1 refresh of 2026-10-30 (decision 0073). The image is built again

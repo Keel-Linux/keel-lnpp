@@ -77,6 +77,19 @@ setup() {
     run ! pgsql_probe_verdict "psql: error: connection to server failed"
 }
 
+@test "has_password: the catalogue says t for a role with a password, whitespace aside" {
+    pgsql_has_password t
+    pgsql_has_password $'t\n'
+    run ! pgsql_has_password f
+    run ! pgsql_has_password ""
+    run ! pgsql_has_password
+    run ! pgsql_has_password "psql: error: role does not exist"
+}
+
+@test "has_password_sql: reads the role from a psql variable, never from the text" {
+    [ "$(pgsql_has_password_sql)" = "SELECT rolpassword IS NOT NULL FROM pg_authid WHERE rolname = :'role';" ]
+}
+
 @test "wait_ready: returns as soon as the command succeeds" {
     PGSQL_SLEEP=:
     attempts=0

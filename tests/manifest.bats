@@ -95,3 +95,63 @@ ROUTE=$OVERLAY/etc/nginx/keel-default.d/50-keel-lnpp.conf
 @test "the check application has no password and no secret" {
     run ! grep -rniE "password=|passwd|secret" "$OVERLAY/usr/share/keel-lnpp"
 }
+
+# keel_as_root ARGS...: keel from KEEL_SRC as root: keel refuses a hook
+# file that root does not own, and the scratch root is the test's own, so a
+# test that is not root runs it in a user namespace where it is root
+keel_as_root() {
+    local wrap=()
+    [ "$(id -u)" = 0 ] || wrap=(unshare -r)
+    "${wrap[@]}" env PYTHONPATH="$KEEL_SRC" python3 -m keel "$@"
+}
+
+@test "manifest: keel resolves it along web and core (KEEL_SRC and KEEL_MANIFEST_SOURCES)" {
+    [ -n "${KEEL_SRC:-}" ] || skip "KEEL_SRC is not set"
+    run tests/lib/manifest-root.sh "$BATS_TEST_TMPDIR/root" "$MANIFEST"
+    [ "$status" -eq 0 ]
+    run keel_as_root manifest validate --root "$BATS_TEST_TMPDIR/root" lnpp
+    echo "$output"
+    [ "$status" -eq 0 ]
+}
+
+@test "manifest: the example spec and the boot test's spec hold against it, with no warning" {
+    # keel 0.23.83 takes a spec that names no appliance with no check of
+    # the manifests, and the example then named an option no manifest
+    # declares: keel-postgresql's example, the same text, was refused by a
+    # first boot that named the appliance (BR1 and BR2, 2026-11-06)
+    [ -n "${KEEL_SRC:-}" ] || skip "KEEL_SRC is not set"
+    run tests/lib/manifest-root.sh "$BATS_TEST_TMPDIR/root" "$MANIFEST"
+    [ "$status" -eq 0 ]
+    for spec in keel/instance.example.yaml keel/instance.pair.example.yaml tests/instance.yaml; do
+        run keel_as_root spec validate --spec "$spec" --no-secret-files --root "$BATS_TEST_TMPDIR/root"
+        echo "$spec: $output"
+        [ "$status" -eq 0 ]
+        [[ "$output" != *Warning* ]]
+    done
+}
+
+@test "manifest: every spec names the lnpp appliance, its mode and the nine overlays of Core and Web" {
+    for spec in keel/instance.example.yaml keel/instance.pair.example.yaml tests/instance.yaml; do
+        python3 - "$spec" <<'PY'
+import sys, yaml
+d = yaml.safe_load(open(sys.argv[1]))
+assert d["appliance"]["name"] == "lnpp", "appliance.name"
+assert d["installation"]["mode"] in ("simple", "cloud_simple"), "installation.mode"
+assert sorted(d["overlays"]) == ["anubis", "coraza", "crowdsec", "etcd", "installer", "nginx", "syncthing", "vip", "wireguard"], d["overlays"]
+assert "options" not in (d.get("app") or {}), "app.options: the manifest declares none"
+assert d["secrets"]["db_password"], "secrets.db_password"
+PY
+    done
+}
+
+@test "manifest: the commissioning contract's instance is the example's shape" {
+    python3 - keel/instance.example.yaml tests/commission.yaml <<'PY'
+import sys, yaml
+example = yaml.safe_load(open(sys.argv[1]))
+instance = yaml.safe_load(open(sys.argv[2]))["instance"]
+for key in ("version", "network", "tls", "appliance", "installation", "overlays", "hub", "first_login_wizard"):
+    assert instance[key] == example[key], key
+assert sorted(instance["secrets"]) == sorted(example["secrets"]), "secrets"
+assert "instance" not in instance, "the machine keeps the name pct create gave it"
+PY
+}
