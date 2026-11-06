@@ -21,6 +21,16 @@
 # variable fab passes to conf/pgsql inside the chroot. It never reaches the
 # inithooks conf and no hook reads it. Nothing here uses it.
 #
+# No DB_PASS is not always a failure. 35pgsqlpass then asks the password
+# on the console, and sets it with no DB_PASS left behind: under keel-init
+# the inithooks conf is empty. So at a console the hook reads the catalogue
+# (by peer, as postgres) and requires a password there. When nobody can
+# answer the console (an LXC's tty1 with nobody attached), 35pgsqlpass
+# asked nothing, and the question is left to keel-init (console_deferred
+# of inithooks' lib/console.sh): the first login starts keel-init. On BR1
+# and BR2, 2026-11-06, both cases stopped with "fatal [36pgsqlverify]: no
+# DB_PASS" (the commissioning test of decision 0075).
+#
 # Decisions live in lib/postgresql.sh; this file is the part that touches
 # the system.
 
@@ -29,8 +39,24 @@ INITHOOKS_DEFAULT="${INITHOOKS_DEFAULT:-/etc/default/inithooks}"
 source "$INITHOOKS_DEFAULT"
 # shellcheck source=../lib/postgresql.sh
 source "$INITHOOKS_PATH/lib/postgresql.sh"
+# shellcheck source=/dev/null
+source "$INITHOOKS_PATH/lib/console.sh"
 
 fatal() { echo "fatal [36pgsqlverify]: $*" >&2; exit 1; }
+
+wait_ready() {
+    systemctl start "$PGSQL_SERVICE.service"
+    pgsql_wait_ready "pg_isready --quiet --host=$PGSQL_VERIFY_HOST --port=$PGSQL_PORT" \
+        "$PGSQL_WAIT_TRIES" \
+        || fatal "$PGSQL_SERVICE did not answer on [$PGSQL_VERIFY_HOST]:$PGSQL_PORT" \
+            "after $PGSQL_WAIT_TRIES tries"
+}
+
+# read_catalogue ROLE: whether ROLE has a password, read as postgres by
+# peer on the local socket, which needs no password
+read_catalogue() {
+    pgsql_has_password_sql | runuser -u postgres -- psql --quiet --no-psqlrc --tuples-only --no-align --dbname=postgres "--set=role=$1"
+}
 
 if [[ -e "$INITHOOKS_CONF" ]]; then
     # shellcheck source=/dev/null
@@ -42,16 +68,24 @@ role=$(pgsql_role "${APP_DB_USER-}") \
 
 mapfile -t missing < <(pgsql_missing_values "${DB_PASS-}")
 if [[ ${#missing[@]} -gt 0 ]]; then
-    fatal "no ${missing[*]} in $INITHOOKS_CONF, so the '$role' role has no" \
-        "password and this appliance has no database anyone can reach:" \
-        "declare secrets.db_password in the instance description"
+    if console_unattended; then
+        console_deferred 36pgsqlverify "no ${missing[*]}: the '$role' role has no password yet, keel-init asks it (35pgsqlpass)"
+        exit 0
+    fi
+    wait_ready
+    answer=$(read_catalogue "$role") || answer=""
+    pgsql_has_password "$answer" \
+        || fatal "no ${missing[*]} in $INITHOOKS_CONF, and the '$role' role" \
+            "has no password: this appliance has no database anyone can" \
+            "reach: declare secrets.db_password in the instance" \
+            "description, or run keel-init"
+    echo "PostgreSQL role '$role' has a password, set on the console" \
+        "(35pgsqlpass); no ${missing[*]} to log in with, so the catalogue" \
+        "is what was checked"
+    exit 0
 fi
 
-systemctl start "$PGSQL_SERVICE.service"
-pgsql_wait_ready "pg_isready --quiet --host=$PGSQL_VERIFY_HOST --port=$PGSQL_PORT" \
-    "$PGSQL_WAIT_TRIES" \
-    || fatal "$PGSQL_SERVICE did not answer on [$PGSQL_VERIFY_HOST]:$PGSQL_PORT" \
-        "after $PGSQL_WAIT_TRIES tries"
+wait_ready
 
 mapfile -t argv < <(pgsql_verify_argv "$role" "$PGSQL_VERIFY_HOST" "$PGSQL_PORT" "$PGSQL_DATABASE") \
     || fatal "cannot build the client arguments for $role@$PGSQL_VERIFY_HOST"

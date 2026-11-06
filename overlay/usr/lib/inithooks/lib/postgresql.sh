@@ -78,6 +78,23 @@ pgsql_probe_verdict() {
     [[ $answer == "$PGSQL_PROBE_ANSWER" ]]
 }
 
+# pgsql_has_password_sql: the query that says whether a role has a
+# password, for the case where no DB_PASS can prove it by a login. The
+# role is the psql variable "role", which psql quotes as a literal, so no
+# name goes into the text.
+pgsql_has_password_sql() {
+    echo "SELECT rolpassword IS NOT NULL FROM pg_authid WHERE rolname = :'role';"
+}
+
+# pgsql_has_password OUTPUT: what psql printed for pgsql_has_password_sql.
+# Only t is a role with a password: f, nothing (no such role) or an error
+# is not.
+pgsql_has_password() {
+    local answer
+    answer=$(printf '%s' "${1-}" | tr -d '[:space:]')
+    [[ $answer == t ]]
+}
+
 # pgsql_wait_ready COMMAND TRIES: run COMMAND until it succeeds, once a
 # second, up to TRIES times. COMMAND is given so a test can pass its own.
 pgsql_wait_ready() {

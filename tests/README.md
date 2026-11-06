@@ -16,6 +16,13 @@ the machine matches the spec.
   runs it against the layers that the mirror publishes.
 - `postgresql.bats`, `hook.bats`: the library and the hook
   `36pgsqlverify`, copied from keel-postgresql with the files they test.
+- `manifest.bats` with `lib/manifest-root.sh`: with `KEEL_SRC` (a checkout
+  of keel) and `KEEL_MANIFEST_SOURCES` (checkouts of keel-core, keel-web and
+  common), keel's own validator holds the three specs against the manifest
+  along web and core; keel runs in a user namespace when the test is not
+  root.
+- `commission.yaml`: the commissioning contract (handbook decision 0075),
+  which `bin/keel-commission` of `Keel-Linux/.github` reads.
 - `check-hook.bats`: the hook `40lnpp-check`, run for real with
   `systemctl`, `pg_isready`, `runuser` and `hostname` as stubs. It checks
   the statements, that the role has no password and only reads, that each

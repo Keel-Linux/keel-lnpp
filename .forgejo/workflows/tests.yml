@@ -52,17 +52,20 @@ jobs:
       systemd: true
       timeout: 30
       run: |
-        # The commits of 2026-10-16, the day of the last green run, and the
-        # same commits that keel-lnmp pins: keel 0.23.32, keel-core and
-        # keel-web with the manifests of the chain, and common 19.x. A branch
-        # name moves: keel-web master has the syncthing overlay now (0.3.4),
-        # which these commits of keel and common do not know. Read from the
-        # GitHub mirrors (decision 0056): the containers of the runner do not
-        # reach git.pop.coop, as keel-web's site job also shows.
-        KEEL_COMMIT=384afa6bfea7990159f827b93f4ad2f01f51f676
+        # Commits of 2026-11-06: keel 0.23.82 (8ecf065, the newest commit on
+        # the GitHub mirror), keel-web with the syncthing overlay (0.3.4 and
+        # later) and common 19.x with its manifest, because the example
+        # specs declare overlays.syncthing (decision 0076, keel 0.23.83
+        # refuses a spec that leaves it out). keel-core stays at the commit
+        # of 2026-10-16: its manifest is the same until it names the modes
+        # of decision 0076, which only keel 0.23.83 reads. A branch name
+        # moves, so commits are pinned. Read from the GitHub mirrors
+        # (decision 0056): the containers of the runner do not reach
+        # git.pop.coop, as keel-web's site job also shows.
+        KEEL_COMMIT=8ecf0658127a8ea921f0c1c5a86a4a88be6fa50b
         CORE_COMMIT=432be9fafd3afd091690fcce3433d4721b5b83f6
-        WEB_COMMIT=493438a993a2c46ad9bba58881f56e889a049298
-        COMMON_COMMIT=cff023f0b40ddc5c24baf92b25ce1f233f348f94
+        WEB_COMMIT=30e07f490651052aa800f1b3aeb5cd5958a7d334
+        COMMON_COMMIT=d974f5a31393dd435c3e0744df3fd81e913f9db5
         apt-get update -qq
         apt-get install -y -qq --no-install-recommends \
           ca-certificates git bats curl iproute2 procps nginx postgresql \
@@ -79,7 +82,7 @@ jobs:
         mkdir -p /tmp/manifests/overlays
         cp /tmp/src/keel-core/packages/keel-core/manifest.yaml /tmp/manifests/core.yaml
         cp /tmp/src/keel-web/packages/keel-web/manifest.yaml /tmp/manifests/web.yaml
-        for overlay in installer wireguard etcd crowdsec vip nginx coraza anubis; do
+        for overlay in installer wireguard etcd crowdsec vip nginx coraza anubis syncthing; do
           cp "/tmp/src/common/packages/$overlay/manifest.yaml" "/tmp/manifests/overlays/$overlay.yaml"
         done
         for _ in $(seq 30); do pg_isready -q && break; sleep 1; done
@@ -100,6 +103,17 @@ jobs:
       appliance: lnpp
       parent: web
       timeout: 60
+  commission:
+    # The commissioning contract, tests/commission.yaml (handbook decision
+    # 0075): the first boot questions, the login that proves each secret,
+    # the services, the URLs and what the image must not hold. This job
+    # only checks that the contract is there and valid; bin/keel-commission
+    # of keel-linux/.github runs it on BR1 and BR2, and no release goes out
+    # without a passing record. It produces the check
+    # "commission / contract".
+    runs-on: keel-host
+    uses: keel-linux/.github/.github/workflows/commission-contract.yml@main
+
   package:
     # Only on a pull request: require-changelog compares the two commits of
     # the pull request. What bt-layer records in the manifest is the top

@@ -30,16 +30,9 @@ secrets:
   root_password:
     file: /etc/keel/secrets/root_password
   # What this layer exists for. It renders to DB_PASS, which
-  # firstboot.d/35mysqlpass reads and hands to bin/pgsqlconf.py.
+  # firstboot.d/35pgsqlpass reads and hands to bin/pgsqlconf.py.
   db_password:
     file: /etc/keel/secrets/db_password
-
-app:
-  options:
-    # Renders to APP_DB_USER: the role the declared password belongs to.
-    # It is the role common's conf/pgsql configures and 35pgsqlpass sets,
-    # named here so an appliance built on this layer sees where it is.
-    db_user: postgres
 
 hub:
   api_key: skip

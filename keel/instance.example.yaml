@@ -6,9 +6,10 @@
 #   /etc/keel/secrets/db_password     the PostgreSQL 'postgres' role
 #
 # secrets.db_password is what reaches the database. Leave it out and the
-# first boot has nothing to set the role with: firstboot.d/36pgsqlverify
-# says so and fails, and the role stays unable to authenticate, which is
-# the state conf.d/main published the layer in.
+# first boot has nothing to set the role with: with nobody at the console,
+# firstboot.d/36pgsqlverify leaves the question to keel-init, and the role
+# stays unable to authenticate (the state conf.d/main published the layer
+# in) until keel-init sets it.
 version: 1
 
 instance:
@@ -31,15 +32,30 @@ tls:
     # web page of its own. Webmin, on 12321, carries its own certificate.
     enabled: false
 
+appliance:
+  name: lnpp
+
+installation:
+  mode: simple
+
+# Every overlay of the chain is written out (decisions 0027 and 0041):
+# those of Core and Web, as this layer adds none.
+overlays:
+  installer: enabled
+  wireguard: disabled
+  etcd: disabled
+  crowdsec: disabled
+  vip: disabled
+  nginx: enabled
+  coraza: disabled
+  anubis: disabled
+  syncthing: disabled
+
 secrets:
   root_password:
     file: /etc/keel/secrets/root_password
   db_password:
     file: /etc/keel/secrets/db_password
-
-app:
-  options:
-    db_user: postgres
 
 hub:
   api_key: skip
