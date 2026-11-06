@@ -20,6 +20,12 @@ keel-lnpp-19.0 (8) keel; urgency=medium
   * The contract asks port 80 of the loopback, as keel-web 0.4.0 serves it
     (handbook decision 0079): http://127.0.0.1/ and /keel-check/ 200,
     /keel-health 204.
+  * The cloud part of the contract takes the shape of the reference
+    contract of .github: hotkeys in the menus, the wait screen, the VIP
+    holder by "carried here: yes", a row written on the primary and read on
+    the standby, the Syncthing folder types, a writable server after a
+    promote, and the check page of the replica says that its server is
+    read-only.
 
  -- KeelLinux maintainers <admin@keellinux.org>  Fri, 06 Nov 2026 06:00:00 +0000
 
