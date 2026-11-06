@@ -12,9 +12,9 @@ keel-lnpp-19.0 (8) keel; urgency=medium
     of keel-postgresql has the same change.
   * keel/instance.example.yaml named app.options.db_user, which no manifest
     of the chain declares, and named no appliance, so keel never checked it
-    against the manifests. The example and the boot test's spec now name
-    the appliance, installation.mode and the nine overlays of Core and Web,
-    and no option; the pair example declares overlays.syncthing.
+    against the manifests. The example now names the appliance,
+    installation.mode and the nine overlays of Core and Web, and no option;
+    the pair example declares overlays.syncthing.
   * tests/commission.yaml, the commissioning contract, and the CI job
     "commission / contract" that checks it.
 

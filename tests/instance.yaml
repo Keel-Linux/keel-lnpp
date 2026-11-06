@@ -26,25 +26,6 @@ tls:
   acme:
     enabled: false
 
-appliance:
-  name: lnpp
-
-installation:
-  mode: simple
-
-# Every overlay of the chain is written out (decisions 0027 and 0041):
-# those of Core and Web, as this layer adds none.
-overlays:
-  installer: enabled
-  wireguard: disabled
-  etcd: disabled
-  crowdsec: disabled
-  vip: disabled
-  nginx: enabled
-  coraza: disabled
-  anubis: disabled
-  syncthing: disabled
-
 secrets:
   root_password:
     file: /etc/keel/secrets/root_password

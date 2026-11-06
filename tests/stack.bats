@@ -147,7 +147,7 @@ code() {
 }
 
 # keel's schema check of the manifest and the specs, against a tree of the
-# chain's manifests: core.yaml and web.yaml, the eight overlays, and the
+# chain's manifests: core.yaml and web.yaml, the nine overlays, and the
 # files they name, made empty and owned by root, as keel requires
 manifest_tree() {
     local tree=$1
