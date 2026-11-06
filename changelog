@@ -17,6 +17,9 @@ keel-lnpp-19.0 (8) keel; urgency=medium
     the pair example declares overlays.syncthing.
   * tests/commission.yaml, the commissioning contract, and the CI job
     "commission / contract" that checks it.
+  * The contract asks port 80 of the loopback, as keel-web 0.4.0 serves it
+    (handbook decision 0079): http://127.0.0.1/ and /keel-check/ 200,
+    /keel-health 204.
 
  -- KeelLinux maintainers <admin@keellinux.org>  Fri, 06 Nov 2026 06:00:00 +0000
 

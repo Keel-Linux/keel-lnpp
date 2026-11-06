@@ -72,6 +72,13 @@ services: [nginx, postgresql, keel-lnpp-check.socket, webmin, cron, postfix, ssh
 urls:
   - {url: 'https://127.0.0.1/', status: 200}
   - {url: 'https://127.0.0.1/keel-check/', status: 200}
+  # port 80 of the loopback is keel-default's (keel-web 0.4.0, handbook
+  # decision 0079): with the self-signed certificate of the first boot it
+  # serves the site and the check page as 443 does, with no redirect, and
+  # /keel-health 204 for the monitor
+  - {url: 'http://127.0.0.1/', status: 200}
+  - {url: 'http://127.0.0.1/keel-check/', status: 200}
+  - {url: 'http://127.0.0.1/keel-health', status: 204}
   - {url: 'https://127.0.0.1:12321/', status: 200}
 # The web pages of the gallery (decision 0077): the default site, the check
 # page of the stack, and Webmin before and after the login with the root
