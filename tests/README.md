@@ -23,6 +23,9 @@ the machine matches the spec.
   root.
 - `commission.yaml`: the commissioning contract (handbook decision 0075),
   which `bin/keel-commission` of `Keel-Linux/.github` reads.
+- `commission-core.yaml`: a copy of `tests/commission.yaml` of keel-core,
+  the contract of the Keel Core witness of the cloud advanced pass. Copy it
+  again when keel-core changes its contract.
 - `check-hook.bats`: the hook `40lnpp-check`, run for real with
   `systemctl`, `pg_isready`, `runuser` and `hostname` as stubs. It checks
   the statements, that the role has no password and only reads, that each
