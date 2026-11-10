@@ -1,3 +1,24 @@
+keel-lnpp-19.0 (9) keel; urgency=medium
+
+  * lnpp.yaml named gunicorn of the check page as a process. Monit requires
+    each process of a manifest to be active, but the socket unit starts
+    gunicorn at the first request only. So 2 to 4 minutes after each boot
+    where nobody had asked /keel-check/, Monit started it and keel sent the
+    critical alert "keel-lnpp-check fails its check" (CT 9364 on BR1, a
+    node of an Odoo pair with the socket and the application of lnpp put
+    back, 2026-11-10; Monit log: status failed at 04:21:52 and 04:23:53,
+    then the alert and the restart). The commissioning runs did not see it, because
+    the contract asks the page of each node in the first minutes.
+  * The check page is no process of the manifest now. systemd holds the
+    socket and starts gunicorn at a request, as before; the contract
+    requires keel-lnpp-check.socket and asks the page.
+  * A layer built on lnpp inherits the processes of lnpp.yaml and cannot
+    remove one. Odoo removes the check page, so each Odoo node had this
+    process with nothing that could start it: Monit sent the same alert and
+    stopped the watch (release A3, the two Odoo pairs).
+
+ -- KeelLinux maintainers <admin@keellinux.org>  Tue, 10 Nov 2026 04:40:00 +0000
+
 keel-lnpp-19.0 (8) keel; urgency=medium
 
   * The commissioning test of handbook decision 0075 (a container made from

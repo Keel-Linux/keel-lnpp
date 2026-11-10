@@ -14,11 +14,13 @@ processes:
     # so 5432 is a mesh port: on the WireGuard interface, never on the
     # uplink.
     listen: [{port: 5432, protocol: tcp, expose: mesh}]
-  - name: keel-lnpp-check
-    # gunicorn, started by keel-lnpp-check.socket on the unix socket
-    # /run/keel-lnpp/check.sock, which Nginx proxies /keel-check/ to: it
-    # opens no TCP port, so it has no listen entry.
-    unit: keel-lnpp-check.service
+  # gunicorn of the check page is not a process here. Its socket unit starts
+  # it at the first request to /keel-check/, so it does not run until then,
+  # and Monit requires each process of a manifest to be active: as a process
+  # it got a restart and a critical alert after each boot where nobody had
+  # asked the page. systemd holds the socket and starts gunicorn again at
+  # the next request. A layer built on lnpp that removes the page has
+  # nothing to keep for it.
 checks:
   - {name: postgresql, process: postgresql, type: protocol, protocol: pgsql,
      address: loopback, port: 5432, on_failure: restart}

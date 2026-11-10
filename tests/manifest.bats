@@ -26,8 +26,21 @@ ROUTE=$OVERLAY/etc/nginx/keel-default.d/50-keel-lnpp.conf
     grep -q "protocol: pgsql" "$MANIFEST"
 }
 
-@test "manifest: the check page is a process with no TCP port" {
-    grep -q "unit: keel-lnpp-check.service" "$MANIFEST"
+# A process of the manifest is a unit that Monit requires to be active.
+# gunicorn is not active until the first request (the socket starts it), so
+# as a process it got a restart and a critical alert some minutes after
+# each boot where nobody had asked the page (CT 9364 on BR1, a node of an
+# Odoo pair with the socket and the application of lnpp put back,
+# 2026-11-10).
+@test "manifest: the check page is no process, because its socket starts it at the first request" {
+    run ! grep -qE "^[^#]*keel-lnpp-check" "$MANIFEST"
+    run grep -cE "^ +- name: " "$MANIFEST"
+    [ "$output" = 2 ]
+    grep -qx "  - name: postgresql" "$MANIFEST"
+    grep -qx "  - name: db_password" "$MANIFEST"
+}
+
+@test "manifest: the one TCP port is 5432, of the process and of its check" {
     run grep -cE "^[^#]*port: " "$MANIFEST"
     [ "$output" = 2 ]
 }
