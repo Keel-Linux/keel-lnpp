@@ -1,3 +1,13 @@
+keel-lnpp-19.0 (10) keel; urgency=high
+
+  * A new build with keel-overlay-coraza 0.1.5 and keel-web 0.4.4 from the
+    Keel archive. keel-overlay-coraza 0.1.4 inspected a request body that
+    had no Content-Type header. One request with no login could make a
+    worker use more than 1 GB of memory. No other file of this repository
+    changed.
+
+ -- KeelLinux maintainers <admin@keellinux.org>  Thu, 12 Nov 2026 12:00:00 +0000
+
 keel-lnpp-19.0 (9) keel; urgency=medium
 
   * lnpp.yaml named gunicorn of the check page as a process. Monit requires
