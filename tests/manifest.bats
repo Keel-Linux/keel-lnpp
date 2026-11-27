@@ -169,9 +169,13 @@ assert "instance" not in instance, "the machine keeps the name pct create gave i
 PY
 }
 
-@test "manifest: the spec of the boot test names no appliance: the host of the test validates it, and has no manifest of lnpp" {
-    # the boot test refused it: "appliance.name: lnpp is not an installed
-    # appliance under /usr/share/keel" (CI of this repository, 2026-11-06)
-    run ! grep -qE '^(appliance|installation|overlays):' tests/instance.yaml
+@test "manifest: the spec of the boot test names lnpp in the simple mode, and keel reads the manifest from the rootfs" {
+    # with no mode the Mode screen stays a question for keel-init and the
+    # init fence stays up (confconsole 2.2.3+keel28); the host of the test
+    # has no manifest of lnpp, so keel spec apply needs --root (it refused
+    # "appliance.name: lnpp is not an installed appliance", 2026-11-06)
+    grep -qx '  name: lnpp' tests/instance.yaml
+    grep -qx '  mode: simple' tests/instance.yaml
+    grep -q 'keel spec apply .*--root "$BT_ROOTFS"' tests/boot-test.sh
     run ! grep -q 'db_user' tests/instance.yaml
 }
