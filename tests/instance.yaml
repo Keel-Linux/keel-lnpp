@@ -26,6 +26,27 @@ tls:
   acme:
     enabled: false
 
+# The appliance, its mode and every overlay of the chain, as in
+# keel-wordpress. The manifest allows the cloud modes, so with no mode the
+# Mode screen of confconsole (2.2.3+keel28) stays a question for keel-init,
+# the init fence stays up, and HTTPS from outside shows the fence page.
+# boot-test.sh gives keel spec apply --root, so keel reads the manifest of
+# lnpp from the assembled rootfs.
+appliance:
+  name: lnpp
+installation:
+  mode: simple
+overlays:
+  installer: enabled
+  wireguard: disabled
+  etcd: disabled
+  crowdsec: disabled
+  vip: disabled
+  nginx: enabled
+  coraza: disabled
+  anubis: disabled
+  syncthing: disabled
+
 secrets:
   root_password:
     file: /etc/keel/secrets/root_password
